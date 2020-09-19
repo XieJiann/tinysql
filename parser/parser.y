@@ -3807,9 +3807,20 @@ JoinTable:
 	/* Use %prec to evaluate production TableRef before cross join */
 	TableRef CrossOpt TableRef %prec tableRefPriority
 	{
-		$$ = &ast.Join{Left: $1.(ast.ResultSetNode), Right: $3.(ast.ResultSetNode), Tp: ast.CrossJoin}
+		$$ = &ast.Join{Left: $1.(ast.ResultSetNode), Right: $3.(ast.ResultSetNode), Tp: ast.CrossJoin} 
 	}
 	/* Your code here. */
+|	TableRef CrossOpt TableRef "ON" Expression %prec tableRefPriority
+	{
+		condion := &ast.OnCondition{Expr: $5.(ast.ExprNode)}
+		$$ = &ast.Join{Left: $1.(ast.ResultSetNode), Right: $3.(ast.ResultSetNode), Tp: ast.CrossJoin, On: condion}
+	}
+|	TableRef JoinType CrossOpt TableRef "ON" Expression %prec tableRefPriority
+	{
+		condion := &ast.OnCondition{Expr: $6.(ast.ExprNode)}
+		$$ = &ast.Join{Left: $1.(ast.ResultSetNode), Right: $4.(ast.ResultSetNode), Tp: $2.(ast.JoinType), On: condion}
+	}
+
 
 JoinType:
 	"LEFT"
