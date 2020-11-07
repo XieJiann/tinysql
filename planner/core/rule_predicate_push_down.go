@@ -14,7 +14,6 @@ package core
 
 import (
 	"context"
-
 	"github.com/pingcap/tidb/expression"
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/mysql"
@@ -356,7 +355,50 @@ func (la *LogicalAggregation) PredicatePushDown(predicates []expression.Expressi
 	// TODO: Here you need to push the predicates across the aggregation.
 	//       A simple example is that `select * from (select count(*) from t group by b) tmp_t where b > 1` is the same with
 	//       `select * from (select count(*) from t where b > 1 group by b) tmp_t.
-	return predicates, la
+	// logical aggre: aggfunc() group by group items from children
+
+	canBePushed := make([]expression.Expression, 0, len(predicates))
+	canNotBePushed := make([]expression.Expression, 0, len(predicates))
+
+	// canBePushed = append(canBePushed, predicates...)
+	//log.Println("predict: ", predicates)
+	//log.Println("aggfunc: ", la.AggFuncs)
+	//log.Println("cols: ", la.groupByCols)
+	//log.Println("child: ", la.children[0].ExplainID())
+
+	groupByCols := expression.NewSchema(la.groupByCols...)
+
+	for _, cond := range predicates {
+		switch cond.(type) {
+		case *expression.Constant:
+			canBePushed = append(canBePushed, cond)
+		case *expression.ScalarFunction:
+			colArray := expression.ExtractColumns(cond)
+			canBePushedFlag := true
+			for _, col := range colArray {
+				if !groupByCols.Contains(col) {
+					canBePushedFlag = false
+					break
+				}
+			}
+
+			if canBePushedFlag {
+				canBePushed = append(canBePushed, cond)
+			} else {
+				canNotBePushed = append(canNotBePushed, cond)
+			}
+		default:
+			canNotBePushed = append(canNotBePushed, cond)
+		}
+	}
+
+	ret, retPlan = la.baseLogicalPlan.PredicatePushDown(canBePushed)
+	return  canNotBePushed, la
+
+	//remained, child := la.children[0].PredicatePushDown(canBePushed)
+	//la.children[0] = child
+	//
+	return append(ret, canNotBePushed...), retPlan
 }
 
 // PredicatePushDown implements LogicalPlan PredicatePushDown interface.

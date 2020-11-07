@@ -66,8 +66,10 @@ func (s *testPlanSuite) TestPredicatePushDown(c *C) {
 	var input, output []string
 	s.testData.GetTestCases(c, &input, &output)
 	ctx := context.Background()
+	//input = []string{"select d from t group by a having d < 1"}
 	for ith, ca := range input {
 		comment := Commentf("for %s", ca)
+		fmt.Println(ca)
 		stmt, err := s.ParseOneStmt(ca, "", "")
 		c.Assert(err, IsNil, comment)
 		p, _, err := BuildLogicalPlan(ctx, s.ctx, stmt, s.is)
